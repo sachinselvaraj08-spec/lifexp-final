@@ -1,0 +1,26 @@
+{
+  "name": "lifexp-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "build:frontend": "npm run build --workspace=apps/frontend",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build:all": "npm run build:shared && npm run build:frontend"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "undici": "5.28.4"
+  },
+  "optionalDependencies": {
+    "@next/swc-win32-x64-msvc": "^16.2.11"
+  },
+  "dependencies": {
+    "undici": "5.28.4"
+  }
+}
