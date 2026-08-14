@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build:all",
-  "installCommand": "npm install",
-  "outputDirectory": "apps/frontend/.next",
+  "buildCommand": "cd ../.. && npm run build:shared && npm run build:frontend",
+  "installCommand": "cd ../.. && npm install",
+  "outputDirectory": ".next",
   "framework": "nextjs"
 }
