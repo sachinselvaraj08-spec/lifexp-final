@@ -80,9 +80,13 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
       .then((data) => {
         if (!cancelled) setHabits(data);
       })
-      .catch((err) => {
-        console.error("[HabitsContext] Fetch failed:", err);
-        if (!cancelled) setError("Failed to load habits. Is the backend running?");
+      .catch((err: any) => {
+        console.error("[HabitsContext] Fetch habits failed:", err);
+        if (!cancelled) {
+          setError(
+            `Failed to load habits: ${err?.message || "Is the backend running?"}`
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);

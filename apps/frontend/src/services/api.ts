@@ -3,8 +3,10 @@
  * All requests are authenticated with a Firebase ID token.
  */
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+function getBackendUrl(): string {
+  const rawUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  return rawUrl.replace(/\/+$/, "");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core fetch wrapper
@@ -15,17 +17,28 @@ async function request<T>(
   token: string,
   body?: Record<string, unknown>
 ): Promise<T> {
-  const res = await fetch(`${BACKEND_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const baseUrl = getBackendUrl();
+  const fullUrl = `${baseUrl}${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(fullUrl, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (err: any) {
+    console.error(`[API Wrapper] Network error connecting to ${fullUrl}:`, err);
+    throw new Error(
+      `Network Error connecting to backend (${baseUrl}). Check NEXT_PUBLIC_BACKEND_URL.`
+    );
+  }
 
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
+    let message = `HTTP ${res.status} ${res.statusText}`;
     try {
       const json = await res.json();
       message = json.error ?? json.message ?? message;
