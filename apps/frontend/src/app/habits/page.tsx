@@ -140,7 +140,7 @@ export default function HabitsPage() {
               </div>
             )}
 
-            {!isLoading && (
+            {!isLoading && !error && (
               <>
             {/* Top Action Header & View Switcher */}
             <div style={topBarStyle} className="page-top-bar">

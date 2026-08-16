@@ -6,33 +6,23 @@
 import { auth as clientAuth } from "./firebase";
 
 function getBackendUrl(): string {
-  const rawUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  const rawUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://lifexp-backend-finalz.vercel.app";
   return rawUrl.replace(/\/+$/, "");
 }
 
 /**
- * Resolves a valid, unexpired Firebase ID token.
- * Prefers obtaining a fresh token directly from clientAuth.currentUser.
+ * Resolves a fresh Firebase ID token directly from clientAuth.currentUser.
  */
-async function resolveToken(providedToken?: string | null, forceRefresh = false): Promise<string | null> {
-  // Wait up to 5 attempts (1.5s) if currentUser is restoring
-  for (let attempt = 0; attempt < 5; attempt++) {
-    if (clientAuth.currentUser) {
-      try {
-        const freshToken = await clientAuth.currentUser.getIdToken(forceRefresh);
-        if (freshToken) return freshToken;
-      } catch (err) {
-        console.error("[API Wrapper] Failed to resolve Firebase ID token from currentUser:", err);
-      }
-    }
-    if (providedToken && providedToken.trim() && !forceRefresh) {
-      return providedToken;
-    }
-    if (attempt < 4 && !providedToken) {
-      await new Promise((r) => setTimeout(r, 300));
-    }
+async function getFreshToken(forceRefresh = false): Promise<string> {
+  const user = clientAuth.currentUser;
+  if (!user) {
+    throw new Error("User is not authenticated");
   }
-  return providedToken || null;
+  const token = await user.getIdToken(forceRefresh);
+  if (!token) {
+    throw new Error("Failed to retrieve Firebase ID token");
+  }
+  return token;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,33 +31,26 @@ async function resolveToken(providedToken?: string | null, forceRefresh = false)
 async function request<T>(
   method: string,
   path: string,
-  token?: string | null,
   body?: Record<string, unknown>,
   isRetry = false
 ): Promise<T> {
   const baseUrl = getBackendUrl();
   const fullUrl = `${baseUrl}${path}`;
-  const activeToken = await resolveToken(token, isRetry);
 
   // Safe frontend logging (NEVER logs token itself)
-  console.log("[AUTH STATE]", {
-    loading: false,
+  console.log("[AUTH DEBUG]", {
     authenticated: !!clientAuth.currentUser,
     uid: clientAuth.currentUser?.uid ?? null,
+    projectId: clientAuth.app.options.projectId,
   });
 
-  console.log("[HABITS REQUEST]", {
-    apiUrl: baseUrl,
+  console.log("[API DEBUG]", {
     endpoint: fullUrl,
     authenticated: !!clientAuth.currentUser,
     uid: clientAuth.currentUser?.uid ?? null,
-    tokenPresent: !!activeToken,
-    tokenLength: activeToken?.length ?? 0,
   });
 
-  if (!activeToken) {
-    throw new Error("No authentication token available. User is not authenticated.");
-  }
+  const activeToken = await getFreshToken(isRetry);
 
   // 10-second request timeout guard
   const controller = new AbortController();
@@ -86,11 +69,11 @@ async function request<T>(
       cache: "no-store",
     });
 
-    console.log("[HABITS RESPONSE]", {
+    console.log("[API DEBUG]", {
       status: res.status,
-      ok: res.ok,
     });
   } catch (err: any) {
+    clearTimeout(timeoutId);
     if (err?.name === "AbortError") {
       throw new Error(`Request to ${fullUrl} timed out after 10s.`);
     }
@@ -102,10 +85,10 @@ async function request<T>(
     clearTimeout(timeoutId);
   }
 
-  // Handle 401 Unauthorized — attempt 1 silent force-refresh retry if user is signed in
+  // Handle 401 Unauthorized — attempt 1 force-refresh retry if user is signed in
   if (res.status === 401 && !isRetry && clientAuth.currentUser) {
-    console.warn("[API Wrapper] HTTP 401 received. Attempting silent Firebase token refresh retry...");
-    return request<T>(method, path, null, body, true);
+    console.warn("[API DEBUG] 401 Unauthorized received. Attempting single retry with force-refreshed token (getIdToken(true))...");
+    return request<T>(method, path, body, true);
   }
 
   if (!res.ok) {
@@ -126,21 +109,34 @@ async function request<T>(
 // Exported API methods
 // ─────────────────────────────────────────────────────────────────────────────
 export const api = {
-  get: <T>(path: string, token?: string | null): Promise<T> =>
-    request<T>("GET", path, token),
+  get: <T>(path: string, _tokenIgnored?: string | null): Promise<T> =>
+    request<T>("GET", path),
 
   post: <T>(
     path: string,
-    token: string | null | undefined,
-    body: Record<string, unknown>
-  ): Promise<T> => request<T>("POST", path, token, body),
+    _tokenOrBody?: string | null | Record<string, unknown>,
+    body?: Record<string, unknown>
+  ): Promise<T> => {
+    const actualBody =
+      typeof _tokenOrBody === "object" && _tokenOrBody !== null
+        ? _tokenOrBody
+        : body;
+    return request<T>("POST", path, actualBody);
+  },
 
   put: <T>(
     path: string,
-    token: string | null | undefined,
-    body: Record<string, unknown>
-  ): Promise<T> => request<T>("PUT", path, token, body),
+    _tokenOrBody?: string | null | Record<string, unknown>,
+    body?: Record<string, unknown>
+  ): Promise<T> => {
+    const actualBody =
+      typeof _tokenOrBody === "object" && _tokenOrBody !== null
+        ? _tokenOrBody
+        : body;
+    return request<T>("PUT", path, actualBody);
+  },
 
-  delete: <T>(path: string, token?: string | null): Promise<T> =>
-    request<T>("DELETE", path, token),
+  delete: <T>(path: string, _tokenIgnored?: string | null): Promise<T> =>
+    request<T>("DELETE", path),
 };
+

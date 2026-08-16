@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         setRawUser(firebaseUser);
         try {
-          const userToken = await firebaseUser.getIdToken();
+          const userToken = await firebaseUser.getIdToken(true);
           setToken(userToken);
         } catch (err) {
           console.error("[AuthContext] Failed to get initial ID token:", err);

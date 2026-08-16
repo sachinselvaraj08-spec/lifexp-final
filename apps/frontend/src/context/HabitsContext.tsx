@@ -89,13 +89,11 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("[HABITS DEBUG] GET /api/v1/habits");
 
       try {
-        const activeToken = (await getIdToken()) || token;
-        const data = await api.get<Habit[]>("/api/v1/habits", activeToken);
+        const data = await api.get<Habit[]>("/api/v1/habits");
         const parsedHabits = Array.isArray(data) ? data : (data as any)?.data || [];
-        console.log("[HABITS DEBUG] status: success, loaded", parsedHabits.length, "habits");
         if (!cancelled) {
           setHabits(parsedHabits);
-          setError(null); // Clear error on successful load
+          setError(null);
         }
       } catch (err: any) {
         console.error("[HABITS DEBUG] Fetch habits failed:", err);
@@ -112,50 +110,44 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, loading, token, getIdToken]);
+  }, [user?.uid, loading]);
 
   // ── Create ────────────────────────────────────────────────────────────────
   const createHabit = useCallback(
     async (data: CreateHabitInput) => {
-      const activeToken = (await getIdToken()) || token;
       const created = await api.post<Habit>(
         "/api/v1/habits",
-        activeToken,
         data as unknown as Record<string, unknown>
       );
       setHabits((prev) => [...prev, created]);
     },
-    [token, getIdToken]
+    []
   );
 
   // ── Update ────────────────────────────────────────────────────────────────
   const updateHabit = useCallback(
     async (id: string, data: Partial<CreateHabitInput>) => {
-      const activeToken = (await getIdToken()) || token;
       const updated = await api.put<Habit>(
         `/api/v1/habits/${id}`,
-        activeToken,
         data as unknown as Record<string, unknown>
       );
       setHabits((prev) => prev.map((h) => (h.id === id ? updated : h)));
     },
-    [token, getIdToken]
+    []
   );
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const deleteHabit = useCallback(
     async (id: string) => {
-      const activeToken = (await getIdToken()) || token;
-      await api.delete(`/api/v1/habits/${id}`, activeToken);
+      await api.delete(`/api/v1/habits/${id}`);
       setHabits((prev) => prev.filter((h) => h.id !== id));
     },
-    [token, getIdToken]
+    []
   );
 
   // ── Toggle completion (optimistic update) ─────────────────────────────────
   const toggleCompletion = useCallback(
     async (habitId: string, dateStr: string): Promise<number> => {
-      const activeToken = (await getIdToken()) || token;
 
       // 1. Optimistic UI update
       setHabits((prev) =>
@@ -179,7 +171,6 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const result = await api.post<Habit & { xpAwarded: number }>(
           `/api/v1/habits/${habitId}/complete`,
-          activeToken,
           { dateStr }
         );
         // Sync state with server-calculated streak
