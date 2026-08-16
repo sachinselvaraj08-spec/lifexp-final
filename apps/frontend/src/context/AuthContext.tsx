@@ -35,16 +35,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── Helper to dynamically fetch a fresh, unexpired Firebase ID Token ───────
   const getIdToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return null;
-    try {
-      const freshToken = await currentUser.getIdToken(forceRefresh);
-      setToken(freshToken);
-      return freshToken;
-    } catch (err) {
-      console.error("[AuthContext] getIdToken failed:", err);
-      return null;
+    // Wait up to 5 attempts (1.5s total) if currentUser is currently restoring
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const freshToken = await currentUser.getIdToken(forceRefresh);
+          if (freshToken) {
+            setToken(freshToken);
+            return freshToken;
+          }
+        } catch (err) {
+          console.error("[AuthContext] getIdToken attempt failed:", err);
+        }
+      }
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 300));
     }
+    return null;
   }, []);
 
   useEffect(() => {

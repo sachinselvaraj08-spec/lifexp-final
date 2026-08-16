@@ -93,7 +93,10 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
         const data = await api.get<Habit[]>("/api/v1/habits", activeToken);
         const parsedHabits = Array.isArray(data) ? data : (data as any)?.data || [];
         console.log("[HABITS DEBUG] status: success, loaded", parsedHabits.length, "habits");
-        if (!cancelled) setHabits(parsedHabits);
+        if (!cancelled) {
+          setHabits(parsedHabits);
+          setError(null); // Clear error on successful load
+        }
       } catch (err: any) {
         console.error("[HABITS DEBUG] Fetch habits failed:", err);
         if (!cancelled) {

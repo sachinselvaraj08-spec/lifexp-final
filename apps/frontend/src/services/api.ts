@@ -15,18 +15,24 @@ function getBackendUrl(): string {
  * Prefers obtaining a fresh token directly from clientAuth.currentUser.
  */
 async function resolveToken(providedToken?: string | null, forceRefresh = false): Promise<string | null> {
-  if (clientAuth.currentUser) {
-    try {
-      const freshToken = await clientAuth.currentUser.getIdToken(forceRefresh);
-      if (freshToken) return freshToken;
-    } catch (err) {
-      console.error("[API Wrapper] Failed to resolve Firebase ID token from currentUser:", err);
+  // Wait up to 5 attempts (1.5s) if currentUser is restoring
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (clientAuth.currentUser) {
+      try {
+        const freshToken = await clientAuth.currentUser.getIdToken(forceRefresh);
+        if (freshToken) return freshToken;
+      } catch (err) {
+        console.error("[API Wrapper] Failed to resolve Firebase ID token from currentUser:", err);
+      }
+    }
+    if (providedToken && providedToken.trim() && !forceRefresh) {
+      return providedToken;
+    }
+    if (attempt < 4 && !providedToken) {
+      await new Promise((r) => setTimeout(r, 300));
     }
   }
-  if (providedToken && providedToken.trim() && !forceRefresh) {
-    return providedToken;
-  }
-  return null;
+  return providedToken || null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,15 +50,20 @@ async function request<T>(
   const activeToken = await resolveToken(token, isRetry);
 
   // Safe frontend logging (NEVER logs token itself)
-  console.log("[HABITS API]", {
-    backendUrl: baseUrl,
+  console.log("[AUTH STATE]", {
+    loading: false,
+    authenticated: !!clientAuth.currentUser,
+    uid: clientAuth.currentUser?.uid ?? null,
+  });
+
+  console.log("[HABITS REQUEST]", {
+    apiUrl: baseUrl,
     endpoint: fullUrl,
     authenticated: !!clientAuth.currentUser,
     uid: clientAuth.currentUser?.uid ?? null,
     tokenPresent: !!activeToken,
     tokenLength: activeToken?.length ?? 0,
   });
-  console.log(`[HABITS API] requesting ${method} ${fullUrl}`);
 
   if (!activeToken) {
     throw new Error("No authentication token available. User is not authenticated.");
@@ -75,7 +86,7 @@ async function request<T>(
       cache: "no-store",
     });
 
-    console.log("[HABITS API] response", {
+    console.log("[HABITS RESPONSE]", {
       status: res.status,
       ok: res.ok,
     });
