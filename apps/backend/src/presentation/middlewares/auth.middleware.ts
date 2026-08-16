@@ -16,25 +16,34 @@ export async function authMiddleware(
   next: NextFunction
 ) {
   const authHeader = req.headers.authorization;
+  console.log("[AUTH] Authorization header present:", !!authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.error("[AUTH] Rejecting request: Authorization header missing or malformed.");
     return res.status(401).json({
-      error: "Unauthorized",
+      success: false,
+      error: "Missing or malformed Authorization header",
       message: "Authorization Bearer token is missing or malformed.",
     });
   }
 
   const idToken = authHeader.split("Bearer ")[1];
+  console.log("[AUTH] Bearer token present:", !!idToken && idToken.length > 10);
 
   if (!idToken || idToken.trim() === "" || idToken === "null" || idToken === "undefined") {
+    console.error("[AUTH] Rejecting request: Invalid token value provided.");
     return res.status(401).json({
-      error: "Unauthorized",
+      success: false,
+      error: "Invalid Authorization header",
       message: "Invalid token value provided.",
     });
   }
 
   try {
     const decodedToken = await auth.verifyIdToken(idToken);
+    console.log("[AUTH] Firebase token verified successfully");
+    console.log("[AUTH] Firebase UID:", decodedToken.uid);
+
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
@@ -43,9 +52,13 @@ export async function authMiddleware(
     };
     return next();
   } catch (error: any) {
-    console.error("[AuthMiddleware] Firebase Token verification failed:", error?.message || error);
+    console.error("[AUTH] Firebase token verification failed:", {
+      code: error?.code,
+      message: error?.message,
+    });
     return res.status(401).json({
-      error: "Unauthorized",
+      success: false,
+      error: "Invalid or expired authorization token",
       message: error?.message || "Invalid or expired authorization token.",
     });
   }

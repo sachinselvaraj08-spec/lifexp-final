@@ -12,20 +12,21 @@ function getBackendUrl(): string {
 
 /**
  * Resolves a valid, unexpired Firebase ID token.
- * If providedToken is absent or invalid, tries auth.currentUser.getIdToken().
+ * Prefers obtaining a fresh token directly from clientAuth.currentUser.
  */
 async function resolveToken(providedToken?: string | null, forceRefresh = false): Promise<string | null> {
+  if (clientAuth.currentUser) {
+    try {
+      const freshToken = await clientAuth.currentUser.getIdToken(forceRefresh);
+      if (freshToken) return freshToken;
+    } catch (err) {
+      console.error("[API Wrapper] Failed to resolve Firebase ID token from currentUser:", err);
+    }
+  }
   if (providedToken && providedToken.trim() && !forceRefresh) {
     return providedToken;
   }
-  if (clientAuth.currentUser) {
-    try {
-      return await clientAuth.currentUser.getIdToken(forceRefresh);
-    } catch (err) {
-      console.error("[API Wrapper] Failed to resolve Firebase ID token:", err);
-    }
-  }
-  return providedToken || null;
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,11 +43,21 @@ async function request<T>(
   const fullUrl = `${baseUrl}${path}`;
   const activeToken = await resolveToken(token, isRetry);
 
+  // Safe frontend logging (NEVER logs token itself)
+  console.log("[HABITS API]", {
+    backendUrl: baseUrl,
+    authenticated: !!clientAuth.currentUser,
+    uid: clientAuth.currentUser?.uid ?? null,
+    tokenPresent: !!activeToken,
+    tokenLength: activeToken?.length ?? 0,
+  });
+  console.log(`[HABITS API] requesting ${method} ${fullUrl}`);
+
   if (!activeToken) {
-    throw new Error("No authentication token available. Please sign in.");
+    throw new Error("No authentication token available. User is not authenticated.");
   }
 
-  // 10-second request timeout guard to prevent UI hanging indefinitely
+  // 10-second request timeout guard
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -61,9 +72,14 @@ async function request<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
+
+    console.log("[HABITS API] response", {
+      status: res.status,
+      ok: res.ok,
+    });
   } catch (err: any) {
     if (err?.name === "AbortError") {
-      throw new Error(`Request to ${fullUrl} timed out after 10s. Backend may be waking up.`);
+      throw new Error(`Request to ${fullUrl} timed out after 10s.`);
     }
     console.error(`[API Wrapper] Network error connecting to ${fullUrl}:`, err);
     throw new Error(

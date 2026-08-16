@@ -21,7 +21,7 @@ app.use(
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, cURL, or server-to-server)
       if (!origin) return callback(null, true);
-      // Allow configured origins or any Vercel preview deployment (*.vercel.app)
+      // Allow configured origins or any Vercel preview/production deployment (*.vercel.app)
       if (
         allowedOrigins.includes(origin) ||
         origin.endsWith(".vercel.app") ||
@@ -31,7 +31,7 @@ app.use(
       }
       return callback(null, true); // Permissive fallback to prevent CORS blocking on custom Vercel domains
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
@@ -41,18 +41,18 @@ app.use(express.json());
 
 // ── Health Check Endpoints ───────────────────────────────────────────────────
 app.get("/health", (_, res: Response) => {
-  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
+  res.status(200).json({ success: true, service: "lifexp-backend" });
 });
 
 app.get("/api/health", (_, res: Response) => {
-  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
+  res.status(200).json({ success: true, service: "lifexp-backend" });
 });
 
 app.get("/api/v1/health", (_, res: Response) => {
-  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
+  res.status(200).json({ success: true, service: "lifexp-backend" });
 });
 
-// ── Authenticated Diagnostic Debug Endpoint ──────────────────────────────────
+// ── Protected Auth Debug Endpoint (Phase 7 / Phase 8 Requirement) ───────────
 app.get(
   "/api/debug/auth",
   authMiddleware,
@@ -60,17 +60,20 @@ app.get(
     res.status(200).json({
       authenticated: true,
       uid: req.user?.uid,
-      email: req.user?.email,
+      email: req.user?.email || null,
     });
   }
 );
 
-// ── Authenticated Business API routes ─────────────────────────────────────────
+// ── Authenticated API routes ──────────────────────────────────────────────────
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/habits", habitsRoutes);
 app.use("/api/v1/focus", focusRoutes);
 
-// ── Legacy demo route (kept for backward compatibility) ───────────────────────
+// Also mount /api/habits for legacy route compatibility if requested
+app.use("/api/habits", habitsRoutes);
+
+// ── Legacy demo route ─────────────────────────────────────────────────────────
 app.get(
   "/api/v1/protected-data",
   authMiddleware,
