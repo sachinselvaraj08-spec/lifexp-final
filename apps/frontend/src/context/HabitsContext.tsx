@@ -80,12 +80,22 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
     setError(null);
 
     const loadHabits = async () => {
+      console.log("[HABITS DEBUG]", {
+        authLoading: loading,
+        currentUser: !!user,
+        uid: user?.uid ?? null,
+        backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
+      });
+      console.log("[HABITS DEBUG] GET /api/v1/habits");
+
       try {
         const activeToken = (await getIdToken()) || token;
         const data = await api.get<Habit[]>("/api/v1/habits", activeToken);
-        if (!cancelled) setHabits(data);
+        const parsedHabits = Array.isArray(data) ? data : (data as any)?.data || [];
+        console.log("[HABITS DEBUG] status: success, loaded", parsedHabits.length, "habits");
+        if (!cancelled) setHabits(parsedHabits);
       } catch (err: any) {
-        console.error("[HabitsContext] Fetch habits failed:", err);
+        console.error("[HABITS DEBUG] Fetch habits failed:", err);
         if (!cancelled) {
           setError(`Failed to load habits: ${err?.message || "Unauthorized"}`);
         }

@@ -46,6 +46,7 @@ async function request<T>(
   // Safe frontend logging (NEVER logs token itself)
   console.log("[HABITS API]", {
     backendUrl: baseUrl,
+    endpoint: fullUrl,
     authenticated: !!clientAuth.currentUser,
     uid: clientAuth.currentUser?.uid ?? null,
     tokenPresent: !!activeToken,
@@ -71,6 +72,7 @@ async function request<T>(
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: controller.signal,
+      cache: "no-store",
     });
 
     console.log("[HABITS API] response", {
