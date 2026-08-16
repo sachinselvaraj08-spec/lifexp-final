@@ -26,6 +26,13 @@ export async function authMiddleware(
 
   const idToken = authHeader.split("Bearer ")[1];
 
+  if (!idToken || idToken.trim() === "" || idToken === "null" || idToken === "undefined") {
+    return res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid token value provided.",
+    });
+  }
+
   try {
     const decodedToken = await auth.verifyIdToken(idToken);
     req.user = {
@@ -35,11 +42,11 @@ export async function authMiddleware(
       photoURL: decodedToken.picture,
     };
     return next();
-  } catch (error) {
-    console.error("Token verification failed:", error);
+  } catch (error: any) {
+    console.error("[AuthMiddleware] Firebase Token verification failed:", error?.message || error);
     return res.status(401).json({
       error: "Unauthorized",
-      message: "Invalid or expired authorization token.",
+      message: error?.message || "Invalid or expired authorization token.",
     });
   }
 }

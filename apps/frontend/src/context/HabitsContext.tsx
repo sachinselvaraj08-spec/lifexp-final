@@ -59,15 +59,19 @@ const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { token, user } = useAuth();
+  const { token, user, loading, getIdToken } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Fetch all habits on auth change ──────────────────────────────────────
+  // ── Fetch all habits when auth restoration completes ─────────────────────
   useEffect(() => {
-    if (!token || !user?.uid) {
+    // Wait until Firebase Auth finishes restoring session
+    if (loading) return;
+
+    if (!user?.uid) {
       setHabits([]);
+      setIsLoading(false);
       return;
     }
 
@@ -75,70 +79,70 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(true);
     setError(null);
 
-    api
-      .get<Habit[]>("/api/v1/habits", token)
-      .then((data) => {
+    const loadHabits = async () => {
+      try {
+        const activeToken = (await getIdToken()) || token;
+        const data = await api.get<Habit[]>("/api/v1/habits", activeToken);
         if (!cancelled) setHabits(data);
-      })
-      .catch((err: any) => {
+      } catch (err: any) {
         console.error("[HabitsContext] Fetch habits failed:", err);
         if (!cancelled) {
-          setError(
-            `Failed to load habits: ${err?.message || "Is the backend running?"}`
-          );
+          setError(`Failed to load habits: ${err?.message || "Unauthorized"}`);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    };
+
+    loadHabits();
 
     return () => {
       cancelled = true;
     };
-  }, [token, user?.uid]);
+  }, [user?.uid, loading, token, getIdToken]);
 
   // ── Create ────────────────────────────────────────────────────────────────
   const createHabit = useCallback(
     async (data: CreateHabitInput) => {
-      if (!token) return;
+      const activeToken = (await getIdToken()) || token;
       const created = await api.post<Habit>(
         "/api/v1/habits",
-        token,
+        activeToken,
         data as unknown as Record<string, unknown>
       );
       setHabits((prev) => [...prev, created]);
     },
-    [token]
+    [token, getIdToken]
   );
 
   // ── Update ────────────────────────────────────────────────────────────────
   const updateHabit = useCallback(
     async (id: string, data: Partial<CreateHabitInput>) => {
-      if (!token) return;
+      const activeToken = (await getIdToken()) || token;
       const updated = await api.put<Habit>(
         `/api/v1/habits/${id}`,
-        token,
+        activeToken,
         data as unknown as Record<string, unknown>
       );
       setHabits((prev) => prev.map((h) => (h.id === id ? updated : h)));
     },
-    [token]
+    [token, getIdToken]
   );
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const deleteHabit = useCallback(
     async (id: string) => {
-      if (!token) return;
-      await api.delete(`/api/v1/habits/${id}`, token);
+      const activeToken = (await getIdToken()) || token;
+      await api.delete(`/api/v1/habits/${id}`, activeToken);
       setHabits((prev) => prev.filter((h) => h.id !== id));
     },
-    [token]
+    [token, getIdToken]
   );
 
   // ── Toggle completion (optimistic update) ─────────────────────────────────
   const toggleCompletion = useCallback(
     async (habitId: string, dateStr: string): Promise<number> => {
-      if (!token) return 0;
+      const activeToken = (await getIdToken()) || token;
 
       // 1. Optimistic UI update
       setHabits((prev) =>
@@ -162,7 +166,7 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const result = await api.post<Habit & { xpAwarded: number }>(
           `/api/v1/habits/${habitId}/complete`,
-          token,
+          activeToken,
           { dateStr }
         );
         // Sync state with server-calculated streak
@@ -186,7 +190,7 @@ export const HabitsProvider: React.FC<{ children: React.ReactNode }> = ({
         return 0;
       }
     },
-    [token]
+    [token, getIdToken]
   );
 
   return (

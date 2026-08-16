@@ -53,7 +53,7 @@ interface UserProfile {
 const GamificationContext = createContext<GamificationContextType | undefined>(undefined);
 
 export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token, user } = useAuth();
+  const { token, user, loading, getIdToken } = useAuth();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [xp, setXp] = useState(0);
@@ -113,8 +113,9 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // ── Fetch profile from Firestore via backend on auth change ───────────────
   useEffect(() => {
-    if (!token || !user?.uid) {
-      // User logged out — reset to defaults
+    if (loading) return; // Wait until Auth finishes restoring session
+
+    if (!user?.uid) {
       setXp(0);
       setCoins(0);
       setRecoveryTokens(2);
@@ -126,7 +127,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const fetchProfile = async () => {
       try {
-        const profile = await api.get<UserProfile>("/api/v1/user/profile", token);
+        const activeToken = (await getIdToken()) || token;
+        const profile = await api.get<UserProfile>("/api/v1/user/profile", activeToken);
         if (cancelled) return;
         setXp(profile.xp ?? 0);
         setCoins(profile.coins ?? 0);
@@ -134,23 +136,24 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setIsLoaded(true);
       } catch (err) {
         console.error("[GamificationContext] Failed to fetch profile:", err);
-        if (!cancelled) setIsLoaded(true); // allow UI to render even if backend unreachable
+        if (!cancelled) setIsLoaded(true);
       }
     };
 
     fetchProfile();
     return () => { cancelled = true; };
-  }, [token, user?.uid]);
+  }, [user?.uid, loading, token, getIdToken]);
 
   // ── Persist helper — fire-and-forget, non-blocking ────────────────────────
   const persistProfile = useCallback(
-    (updates: Record<string, number>) => {
-      if (!token) return;
-      api.put("/api/v1/user/profile", token, updates as Record<string, unknown>).catch((err) =>
+    async (updates: Record<string, number>) => {
+      const activeToken = (await getIdToken()) || token;
+      if (!activeToken) return;
+      api.put("/api/v1/user/profile", activeToken, updates as Record<string, unknown>).catch((err) =>
         console.error("[GamificationContext] Failed to persist profile:", err)
       );
     },
-    [token]
+    [token, getIdToken]
   );
 
   // ── addXP — updates local state and persists ──────────────────────────────

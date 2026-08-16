@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -18,6 +18,7 @@ interface AuthContextType {
   rawUser: FirebaseUser | null;
   token: string | null;
   loading: boolean;
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
   login: (credentials: LoginInput) => Promise<void>;
   register: (credentials: RegisterInput) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -32,13 +33,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ── Helper to dynamically fetch a fresh, unexpired Firebase ID Token ───────
+  const getIdToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return null;
+    try {
+      const freshToken = await currentUser.getIdToken(forceRefresh);
+      setToken(freshToken);
+      return freshToken;
+    } catch (err) {
+      console.error("[AuthContext] getIdToken failed:", err);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
         setRawUser(firebaseUser);
-        const userToken = await firebaseUser.getIdToken();
-        setToken(userToken);
+        try {
+          const userToken = await firebaseUser.getIdToken();
+          setToken(userToken);
+        } catch (err) {
+          console.error("[AuthContext] Failed to get initial ID token:", err);
+          setToken(null);
+        }
 
         setUser({
           uid: firebaseUser.uid,
@@ -101,6 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       await signOut(auth);
+      setRawUser(null);
+      setToken(null);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -113,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         rawUser,
         token,
         loading,
+        getIdToken,
         login,
         register,
         loginWithGoogle,

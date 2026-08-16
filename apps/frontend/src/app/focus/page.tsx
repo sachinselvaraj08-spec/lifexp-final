@@ -11,7 +11,7 @@ import { api } from "../../services/api";
 
 export default function FocusPage() {
   const { addXP, addCoins } = useGamification();
-  const { token } = useAuth();
+  const { token, loading, getIdToken } = useAuth();
 
   // Modes: 25m Pomodoro (1500s), 50m Deep Work (3000s), 5m Short Break (300s)
   const [timerMode, setTimerMode] = useState<"pomodoro" | "deep" | "shortBreak">("pomodoro");
@@ -25,18 +25,22 @@ export default function FocusPage() {
 
   // Fetch today's daily progress from Firestore on mount
   useEffect(() => {
-    if (!token) return;
-    api
-      .get<{ totalFocusMinutes: number; completedSessions: number }>(
-        "/api/v1/focus/daily",
-        token
-      )
-      .then((data) => {
+    if (loading) return;
+    const loadDaily = async () => {
+      try {
+        const activeToken = (await getIdToken()) || token;
+        const data = await api.get<{ totalFocusMinutes: number; completedSessions: number }>(
+          "/api/v1/focus/daily",
+          activeToken
+        );
         setTodayFocusMinutes(data.totalFocusMinutes ?? 0);
         setCompletedSessions(data.completedSessions ?? 0);
-      })
-      .catch((err) => console.error("[FocusPage] Failed to fetch daily progress:", err));
-  }, [token]);
+      } catch (err) {
+        console.error("[FocusPage] Failed to fetch daily progress:", err);
+      }
+    };
+    loadDaily();
+  }, [token, loading, getIdToken]);
 
   // Timer Tick Logic
   useEffect(() => {
