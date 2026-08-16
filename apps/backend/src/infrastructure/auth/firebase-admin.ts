@@ -14,14 +14,27 @@ if (!admin.apps.length) {
 
     if (serviceAccountJson) {
       // Production / Vercel: credentials supplied as an env-var JSON string
-      const serviceAccount = JSON.parse(serviceAccountJson);
+      const serviceAccount = typeof serviceAccountJson === "string" 
+        ? JSON.parse(serviceAccountJson)
+        : serviceAccountJson;
+
+      // Handle escaped newlines in private key if present (common Vercel env var formatting)
+      if (serviceAccount && typeof serviceAccount.private_key === "string") {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+      }
+
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
       console.log("[Firebase] Admin SDK initialized from FIREBASE_SERVICE_ACCOUNT_JSON env var.");
     } else if (fs.existsSync(resolvedPath)) {
-      // Local development: credentials file on disk
+      // Local development fallback: credentials file on disk
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+
+      if (serviceAccount && typeof serviceAccount.private_key === "string") {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+      }
+
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
