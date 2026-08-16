@@ -29,7 +29,7 @@ async function resolveToken(providedToken?: string | null, forceRefresh = false)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core fetch wrapper with 401 Token Refresh Retry
+// Core fetch wrapper with 10s AbortController timeout & 401 Silent Retry
 // ─────────────────────────────────────────────────────────────────────────────
 async function request<T>(
   method: string,
@@ -46,6 +46,10 @@ async function request<T>(
     throw new Error("No authentication token available. Please sign in.");
   }
 
+  // 10-second request timeout guard to prevent UI hanging indefinitely
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   let res: Response;
   try {
     res = await fetch(fullUrl, {
@@ -55,12 +59,18 @@ async function request<T>(
         Authorization: `Bearer ${activeToken}`,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
   } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`Request to ${fullUrl} timed out after 10s. Backend may be waking up.`);
+    }
     console.error(`[API Wrapper] Network error connecting to ${fullUrl}:`, err);
     throw new Error(
       `Network Error connecting to backend (${baseUrl}). Check NEXT_PUBLIC_BACKEND_URL.`
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // Handle 401 Unauthorized — attempt 1 silent force-refresh retry if user is signed in

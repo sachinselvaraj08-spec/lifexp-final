@@ -28,35 +28,65 @@ function calculateStreak(logs: Record<string, boolean>): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/habits
-// Returns all habits for the authenticated user, ordered by createdAt.
+// Returns all habits for the authenticated user, sorted by createdAt.
+// Uses in-memory sorting and a 8s timeout guard to prevent Firestore hangs.
 // ─────────────────────────────────────────────────────────────────────────────
 router.get(
   "/",
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response) => {
+    const uid = req.user!.uid;
+    const maskedUid = uid ? `${uid.substring(0, 6)}***` : "unknown";
+    console.log(`[habits GET] Incoming request from authenticated user: ${maskedUid}`);
+
     try {
-      const uid = req.user!.uid;
-      const snap = await db
+      console.log(`[habits GET] Querying Firestore path: users/${maskedUid}/habits`);
+
+      // 8-second timeout race guard to prevent Vercel serverless function hangs
+      const fetchPromise = db
         .collection("users")
         .doc(uid)
         .collection("habits")
-        .orderBy("createdAt", "asc")
         .get();
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Firestore database query timed out after 8s")),
+          8000
+        )
+      );
+
+      const snap = (await Promise.race([
+        fetchPromise,
+        timeoutPromise,
+      ])) as admin.firestore.QuerySnapshot;
+
+      console.log(`[habits GET] Successfully retrieved ${snap.size} documents from Firestore.`);
 
       const habits = snap.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+          createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? (typeof data.createdAt === "string" ? data.createdAt : null),
+          updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? (typeof data.updatedAt === "string" ? data.updatedAt : null),
         };
       });
 
+      // Sort in-memory to prevent index requirements or missing field query blocks
+      habits.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeA - timeB;
+      });
+
       return res.status(200).json(habits);
-    } catch (error) {
-      console.error("[habits GET]", error);
-      return res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error(`[habits GET] Query failed for UID ${maskedUid}:`, error?.message || error);
+      return res.status(500).json({
+        error: "Firestore Query Error",
+        message: error?.message || "Failed to fetch habits from database.",
+      });
     }
   }
 );
@@ -69,8 +99,10 @@ router.post(
   "/",
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response) => {
+    const uid = req.user!.uid;
+    const maskedUid = uid ? `${uid.substring(0, 6)}***` : "unknown";
+
     try {
-      const uid = req.user!.uid;
       const { title, category, frequency, targetQuantity, unit } = req.body;
 
       if (!title || typeof title !== "string" || !title.trim()) {
@@ -82,6 +114,8 @@ router.post(
       if (!frequency) {
         return res.status(400).json({ error: "frequency is required" });
       }
+
+      console.log(`[habits POST] Creating habit '${title.trim()}' for UID: ${maskedUid}`);
 
       const now = admin.firestore.FieldValue.serverTimestamp();
       const habitData = {
@@ -106,15 +140,20 @@ router.post(
 
       const created = await docRef.get();
       const data = created.data()!;
+      console.log(`[habits POST] Habit created successfully with ID: ${docRef.id}`);
+
       return res.status(201).json({
         id: docRef.id,
         ...data,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-    } catch (error) {
-      console.error("[habits POST]", error);
-      return res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error(`[habits POST] Creation failed for UID ${maskedUid}:`, error?.message || error);
+      return res.status(500).json({
+        error: "Firestore Creation Error",
+        message: error?.message || "Failed to create habit in database.",
+      });
     }
   }
 );
@@ -127,8 +166,10 @@ router.put(
   "/:habitId",
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response) => {
+    const uid = req.user!.uid;
+    const maskedUid = uid ? `${uid.substring(0, 6)}***` : "unknown";
+
     try {
-      const uid = req.user!.uid;
       const { habitId } = req.params;
       const { title, category, frequency, targetQuantity, unit } = req.body;
 
@@ -163,9 +204,12 @@ router.put(
         createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
       });
-    } catch (error) {
-      console.error("[habits PUT]", error);
-      return res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error(`[habits PUT] Update failed for UID ${maskedUid}:`, error?.message || error);
+      return res.status(500).json({
+        error: "Firestore Update Error",
+        message: error?.message || "Failed to update habit in database.",
+      });
     }
   }
 );
@@ -177,8 +221,10 @@ router.delete(
   "/:habitId",
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response) => {
+    const uid = req.user!.uid;
+    const maskedUid = uid ? `${uid.substring(0, 6)}***` : "unknown";
+
     try {
-      const uid = req.user!.uid;
       const { habitId } = req.params;
 
       const habitRef = db
@@ -193,10 +239,14 @@ router.delete(
       }
 
       await habitRef.delete();
+      console.log(`[habits DELETE] Deleted habit ${habitId} for UID: ${maskedUid}`);
       return res.status(200).json({ message: "Habit deleted successfully" });
-    } catch (error) {
-      console.error("[habits DELETE]", error);
-      return res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error(`[habits DELETE] Delete failed for UID ${maskedUid}:`, error?.message || error);
+      return res.status(500).json({
+        error: "Firestore Delete Error",
+        message: error?.message || "Failed to delete habit from database.",
+      });
     }
   }
 );
@@ -204,16 +254,16 @@ router.delete(
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/habits/:habitId/complete
 // Toggles completion for a given date (YYYY-MM-DD).
-// Recalculates streak. Returns xpAwarded (50 when completing, 0 when uncompleting).
-// NOTE: XP is NOT written to Firestore here — the frontend handles that via
-//       PUT /api/v1/user/profile so there is a single source of truth.
+// Recalculates streak. Returns xpAwarded.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post(
   "/:habitId/complete",
   authMiddleware,
   async (req: AuthenticatedRequest, res: Response) => {
+    const uid = req.user!.uid;
+    const maskedUid = uid ? `${uid.substring(0, 6)}***` : "unknown";
+
     try {
-      const uid = req.user!.uid;
       const { habitId } = req.params;
       const { dateStr } = req.body as { dateStr?: string };
 
@@ -285,12 +335,14 @@ router.post(
         ...data,
         createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
-        // Frontend uses this to call addXP via GamificationContext
         xpAwarded: nowCompleted ? habit.xpReward ?? 50 : 0,
       });
-    } catch (error) {
-      console.error("[habits/:habitId/complete POST]", error);
-      return res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error(`[habits complete] Toggle failed for UID ${maskedUid}:`, error?.message || error);
+      return res.status(500).json({
+        error: "Firestore Toggle Error",
+        message: error?.message || "Failed to update completion status.",
+      });
     }
   }
 );
