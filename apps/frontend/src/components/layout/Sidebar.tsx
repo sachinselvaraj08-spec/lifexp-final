@@ -20,7 +20,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside style={sidebarStyle}>
+    <aside style={sidebarStyle} className="sidebar-desktop">
       <div style={logoContainerStyle}>
         <div style={logoBadgeStyle}>XP</div>
         <span style={logoTextStyle}>LifeXP</span>

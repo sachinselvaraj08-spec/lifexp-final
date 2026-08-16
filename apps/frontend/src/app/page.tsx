@@ -1,71 +1,85 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "../components/layout/ProtectedRoute";
 import { Sidebar } from "../components/layout/Sidebar";
 import { Header } from "../components/layout/Header";
+import { MobileNav } from "../components/layout/MobileNav";
 import { useAuth } from "../context/AuthContext";
+import { useHabits } from "../context/HabitsContext";
+import { useGamification } from "../context/GamificationContext";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { habits, isLoading, toggleCompletion } = useHabits();
+  const { addXP } = useGamification();
 
-  // Mock State for Phase 1 Dashboard
-  const [habits, setHabits] = useState([
-    { id: "1", title: "Morning Workout / Gym Session", streak: 12, completed: true, xp: 50 },
-    { id: "2", title: "Read 20 pages of a book", streak: 5, completed: false, xp: 30 },
-    { id: "3", title: "Deep Work Focus Session (45m)", streak: 8, completed: false, xp: 60 },
-    { id: "4", title: "Drink 3L of Water", streak: 14, completed: true, xp: 20 },
-  ]);
+  const todayStr = new Date().toISOString().split("T")[0];
 
-  const toggleHabit = (id: string) => {
-    setHabits((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, completed: !h.completed } : h))
-    );
+  // Derive today's completion from real Firestore logs
+  const todayHabits = habits.map((h) => ({
+    id: h.id,
+    title: h.title,
+    streak: h.currentStreak,
+    completed: !!h.logs[todayStr],
+    xp: h.xpReward ?? 50,
+  }));
+
+  const handleToggleHabit = async (id: string) => {
+    const xpAwarded = await toggleCompletion(id, todayStr);
+    if (xpAwarded > 0) addXP(xpAwarded);
   };
 
-  const completedCount = habits.filter((h) => h.completed).length;
+  const completedCount = todayHabits.filter((h) => h.completed).length;
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Welcome Banner */}
-            <div style={bannerStyle}>
+            <div style={bannerStyle} className="dashboard-banner">
               <div>
-                <h1 style={bannerTitleStyle}>
+                <h1 style={bannerTitleStyle} className="dashboard-banner-title">
                   Welcome back, {user?.displayName || "Adventurer"}! 👋
                 </h1>
                 <p style={bannerSubtitleStyle}>
-                  You've completed {completedCount} of {habits.length} habits today. Keep the streak alive!
+                  You've completed {completedCount} of {todayHabits.length} habits today. Keep the streak alive!
                 </p>
               </div>
-              <Link href="/habits" style={bannerButtonStyle}>
+              <Link href="/habits" style={bannerButtonStyle} className="dashboard-banner-btn">
                 + Add New Habit
               </Link>
             </div>
 
             {/* Dashboard Grid Layout */}
-            <div style={gridStyle}>
+            <div style={gridStyle} className="grid-2col">
               {/* Left Column: Daily Habits Today */}
               <div style={cardStyle}>
                 <div style={cardHeaderStyle}>
                   <h2 style={cardTitleStyle}>📋 Today's Habits</h2>
                   <span style={countBadgeStyle}>
-                    {completedCount}/{habits.length} Done
+                    {completedCount}/{todayHabits.length} Done
                   </span>
                 </div>
 
                 <div style={habitListStyle}>
-                  {habits.map((habit) => (
+                 {isLoading ? (
+                  <div style={{ color: "#94A3B8", padding: "20px", textAlign: "center" }}>Loading habits…</div>
+                ) : todayHabits.length === 0 ? (
+                  <div style={{ color: "#94A3B8", padding: "20px", textAlign: "center" }}>
+                    No habits yet. <Link href="/habits" style={{ color: "#F59E0B" }}>Create your first habit →</Link>
+                  </div>
+                ) : todayHabits.map((habit) => (
                     <div
                       key={habit.id}
-                      onClick={() => toggleHabit(habit.id)}
+                      onClick={() => handleToggleHabit(habit.id)}
                       style={{
                         ...habitItemStyle,
                         backgroundColor: habit.completed ? "#0F172A" : "#1E293B",
@@ -134,7 +148,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <div style={milestoneGridStyle}>
+              <div style={milestoneGridStyle} className="milestone-grid">
                 <div style={milestoneCardStyle}>
                   <span style={badgeIconStyle}>⚡</span>
                   <div>

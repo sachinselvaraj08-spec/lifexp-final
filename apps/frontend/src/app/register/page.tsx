@@ -57,8 +57,8 @@ export default function RegisterPage() {
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
-        <h1 style={titleStyle}>LifeXP</h1>
+      <div style={cardStyle} className="auth-card">
+        <h1 style={titleStyle} className="auth-title">LifeXP</h1>
         <p style={subtitleStyle}>Create your profile and start gaining XP.</p>
 
         {error && <div style={errorStyle}>{error}</div>}

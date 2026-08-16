@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 
 export default function ReportsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -23,15 +24,16 @@ export default function ReportsPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="reports-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>📄 Monthly PDF Reports</h1>
                 <p style={pageSubtitleStyle}>
@@ -43,6 +45,7 @@ export default function ReportsPage() {
                 onClick={handleGeneratePdf}
                 disabled={isGenerating}
                 style={generateButtonStyle}
+                className="reports-generate-btn"
               >
                 {isGenerating ? "Generating PDF..." : "📥 Generate July 2026 Report"}
               </button>
@@ -50,7 +53,7 @@ export default function ReportsPage() {
 
             {/* Live Report Preview Document */}
             <div style={documentCardStyle}>
-              <div style={docHeaderStyle}>
+              <div style={docHeaderStyle} className="doc-header">
                 <div>
                   <h2 style={docTitleStyle}>LifeXP Monthly Performance Summary</h2>
                   <div style={docSubtitleStyle}>Report Period: July 1 - July 23, 2026 • User: Adventurer</div>
@@ -60,7 +63,7 @@ export default function ReportsPage() {
 
               <div style={dividerStyle} />
 
-              <div style={gridMetricsStyle}>
+              <div style={gridMetricsStyle} className="metrics-grid">
                 <div style={metricBoxStyle}>
                   <div style={metricLabelStyle}>Total Habits Completed</div>
                   <div style={metricValueStyle}>142</div>
@@ -92,12 +95,12 @@ export default function ReportsPage() {
               <h2 style={cardTitleStyle}>📁 Past Monthly Archives</h2>
               <div style={archiveListStyle}>
                 {pastReports.map((report, i) => (
-                  <div key={i} style={archiveItemStyle}>
+                  <div key={i} style={archiveItemStyle} className="archive-item">
                     <div>
                       <div style={archiveMonthStyle}>{report.month} Report</div>
                       <div style={archiveMetaStyle}>Generated on {report.generatedAt} • {report.size}</div>
                     </div>
-                    <button onClick={handleGeneratePdf} style={downloadButtonStyle}>
+                    <button onClick={handleGeneratePdf} style={downloadButtonStyle} className="archive-dl-btn">
                       ⬇️ Download PDF
                     </button>
                   </div>

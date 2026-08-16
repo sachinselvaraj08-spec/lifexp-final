@@ -1,11 +1,19 @@
 import React from "react";
 import { AuthProvider } from "../context/AuthContext";
 import { GamificationProvider } from "../context/GamificationContext";
+import { HabitsProvider } from "../context/HabitsContext";
 import "../styles/globals.css";
+import "../styles/mobile.css";
 
 export const metadata = {
   title: "LifeXP",
   description: "Gamified productivity, habits tracker, and analytics dashboard.",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -18,7 +26,9 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <GamificationProvider>
-            {children}
+            <HabitsProvider>
+              {children}
+            </HabitsProvider>
           </GamificationProvider>
         </AuthProvider>
       </body>

@@ -56,8 +56,8 @@ export default function LoginPage() {
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
-        <h1 style={titleStyle}>LifeXP</h1>
+      <div style={cardStyle} className="auth-card">
+        <h1 style={titleStyle} className="auth-title">LifeXP</h1>
         <p style={subtitleStyle}>Level up your habits and track your focus.</p>
 
         {error && <div style={errorStyle}>{error}</div>}

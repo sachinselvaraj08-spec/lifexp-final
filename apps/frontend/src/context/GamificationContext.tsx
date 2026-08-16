@@ -1,7 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "./AuthContext";
+import { api } from "../services/api";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 export interface Achievement {
   id: string;
   code: string;
@@ -20,6 +25,7 @@ interface GamificationContextType {
   coins: number;
   recoveryTokens: number;
   achievements: Achievement[];
+  isLoaded: boolean;
   addXP: (amount: number, reason?: string) => void;
   addCoins: (amount: number) => void;
   buyRecoveryToken: () => boolean;
@@ -29,15 +35,33 @@ interface GamificationContextType {
   clearLevelUpBanner: () => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const calculateLevel = (currentXp: number) => Math.floor(currentXp / 250) + 1;
+
+interface UserProfile {
+  xp?: number;
+  coins?: number;
+  recoveryTokens?: number;
+  level?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Context
+// ─────────────────────────────────────────────────────────────────────────────
 const GamificationContext = createContext<GamificationContextType | undefined>(undefined);
 
 export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [xp, setXp] = useState(3760);
-  const [coins, setCoins] = useState(240);
+  const { token, user } = useAuth();
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [xp, setXp] = useState(0);
+  const [coins, setCoins] = useState(0);
   const [recoveryTokens, setRecoveryTokens] = useState(2);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [recentLevelUp, setRecentLevelUp] = useState<number | null>(null);
 
-  const calculateLevel = (currentXp: number) => Math.floor(currentXp / 250) + 1;
   const level = calculateLevel(xp);
 
   const [achievements, setAchievements] = useState<Achievement[]>([
@@ -87,63 +111,142 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     },
   ]);
 
-  const addXP = (amount: number, reason?: string) => {
-    setXp((prevXp) => {
-      const newXp = prevXp + amount;
-      const prevLevel = calculateLevel(prevXp);
-      const newLevel = calculateLevel(newXp);
-      if (newLevel > prevLevel) {
-        setRecentLevelUp(newLevel);
-        // Bonus reward on level up!
-        setCoins((c) => c + 50);
-        setRecoveryTokens((t) => t + 1);
+  // ── Fetch profile from Firestore via backend on auth change ───────────────
+  useEffect(() => {
+    if (!token || !user?.uid) {
+      // User logged out — reset to defaults
+      setXp(0);
+      setCoins(0);
+      setRecoveryTokens(2);
+      setIsLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchProfile = async () => {
+      try {
+        const profile = await api.get<UserProfile>("/api/v1/user/profile", token);
+        if (cancelled) return;
+        setXp(profile.xp ?? 0);
+        setCoins(profile.coins ?? 0);
+        setRecoveryTokens(profile.recoveryTokens ?? 2);
+        setIsLoaded(true);
+      } catch (err) {
+        console.error("[GamificationContext] Failed to fetch profile:", err);
+        if (!cancelled) setIsLoaded(true); // allow UI to render even if backend unreachable
       }
-      return newXp;
-    });
-  };
+    };
 
-  const addCoins = (amount: number) => {
-    setCoins((prev) => prev + amount);
-  };
+    fetchProfile();
+    return () => { cancelled = true; };
+  }, [token, user?.uid]);
 
-  const buyRecoveryToken = (): boolean => {
-    const TOKEN_PRICE = 50;
-    if (coins >= TOKEN_PRICE) {
-      setCoins((prev) => prev - TOKEN_PRICE);
-      setRecoveryTokens((prev) => prev + 1);
-      return true;
-    }
-    return false;
-  };
-
-  const useRecoveryToken = (): boolean => {
-    if (recoveryTokens > 0) {
-      setRecoveryTokens((prev) => prev - 1);
-      // Unlock recovery achievement if not yet unlocked
-      setAchievements((prev) =>
-        prev.map((a) => (a.code === "STREAK_RECOVERY" ? { ...a, unlocked: true } : a))
+  // ── Persist helper — fire-and-forget, non-blocking ────────────────────────
+  const persistProfile = useCallback(
+    (updates: Record<string, number>) => {
+      if (!token) return;
+      api.put("/api/v1/user/profile", token, updates as Record<string, unknown>).catch((err) =>
+        console.error("[GamificationContext] Failed to persist profile:", err)
       );
-      return true;
-    }
-    return false;
-  };
+    },
+    [token]
+  );
 
-  const claimAchievement = (id: string) => {
-    setAchievements((prev) =>
-      prev.map((a) => {
-        if (a.id === id && a.unlocked && !a.claimed) {
-          addXP(a.xpReward);
-          addCoins(a.coinReward);
-          return { ...a, claimed: true };
+  // ── addXP — updates local state and persists ──────────────────────────────
+  const addXP = useCallback(
+    (amount: number) => {
+      setXp((prevXp) => {
+        const newXp = prevXp + amount;
+        const prevLevel = calculateLevel(prevXp);
+        const newLevel = calculateLevel(newXp);
+
+        if (newLevel > prevLevel) {
+          setRecentLevelUp(newLevel);
+          // Level-up bonus: +50 coins, +1 recovery token
+          setCoins((prevCoins) => {
+            const newCoins = prevCoins + 50;
+            setRecoveryTokens((prevTokens) => {
+              const newTokens = prevTokens + 1;
+              persistProfile({ xp: newXp, level: newLevel, coins: newCoins, recoveryTokens: newTokens });
+              return newTokens;
+            });
+            return newCoins;
+          });
+        } else {
+          persistProfile({ xp: newXp, level: newLevel });
         }
-        return a;
-      })
-    );
-  };
 
-  const clearLevelUpBanner = () => {
-    setRecentLevelUp(null);
-  };
+        return newXp;
+      });
+    },
+    [persistProfile]
+  );
+
+  // ── addCoins ──────────────────────────────────────────────────────────────
+  const addCoins = useCallback(
+    (amount: number) => {
+      setCoins((prev) => {
+        const newCoins = prev + amount;
+        persistProfile({ coins: newCoins });
+        return newCoins;
+      });
+    },
+    [persistProfile]
+  );
+
+  // ── buyRecoveryToken (costs 50 coins) ─────────────────────────────────────
+  const buyRecoveryToken = useCallback((): boolean => {
+    const TOKEN_PRICE = 50;
+    let success = false;
+    setCoins((prevCoins) => {
+      if (prevCoins < TOKEN_PRICE) return prevCoins;
+      success = true;
+      const newCoins = prevCoins - TOKEN_PRICE;
+      setRecoveryTokens((prevTokens) => {
+        const newTokens = prevTokens + 1;
+        persistProfile({ coins: newCoins, recoveryTokens: newTokens });
+        return newTokens;
+      });
+      return newCoins;
+    });
+    return success;
+  }, [persistProfile]);
+
+  // ── useRecoveryToken ──────────────────────────────────────────────────────
+  const useRecoveryToken = useCallback((): boolean => {
+    let success = false;
+    setRecoveryTokens((prev) => {
+      if (prev <= 0) return prev;
+      success = true;
+      const newTokens = prev - 1;
+      persistProfile({ recoveryTokens: newTokens });
+      setAchievements((prevAch) =>
+        prevAch.map((a) => (a.code === "STREAK_RECOVERY" ? { ...a, unlocked: true } : a))
+      );
+      return newTokens;
+    });
+    return success;
+  }, [persistProfile]);
+
+  // ── claimAchievement ──────────────────────────────────────────────────────
+  const claimAchievement = useCallback(
+    (id: string) => {
+      setAchievements((prev) =>
+        prev.map((a) => {
+          if (a.id === id && a.unlocked && !a.claimed) {
+            addXP(a.xpReward);
+            addCoins(a.coinReward);
+            return { ...a, claimed: true };
+          }
+          return a;
+        })
+      );
+    },
+    [addXP, addCoins]
+  );
+
+  const clearLevelUpBanner = useCallback(() => setRecentLevelUp(null), []);
 
   return (
     <GamificationContext.Provider
@@ -153,6 +256,7 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         coins,
         recoveryTokens,
         achievements,
+        isLoaded,
         addXP,
         addCoins,
         buyRecoveryToken,

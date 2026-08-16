@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 
 interface ChatMessage {
   id: string;
@@ -69,15 +70,16 @@ export default function CoachPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>🤖 AI Productivity Coach</h1>
                 <p style={pageSubtitleStyle}>
@@ -87,9 +89,9 @@ export default function CoachPage() {
             </div>
 
             {/* Split Screen Layout */}
-            <div style={gridTwoColStyle}>
+            <div style={gridTwoColStyle} className="grid-2col">
               {/* Left Column: Conversational AI Chat */}
-              <div style={chatCardStyle}>
+              <div style={chatCardStyle} className="chat-card">
                 <div style={chatHeaderStyle}>
                   <div style={coachStatusStyle}>
                     <span style={coachAvatarStyle}>🤖</span>
@@ -124,7 +126,7 @@ export default function CoachPage() {
                 </div>
 
                 {/* Quick Suggestion Prompts */}
-                <div style={quickPromptsRowStyle}>
+                <div style={quickPromptsRowStyle} className="quick-prompts-row">
                   <button
                     onClick={() => handleSendMessage("Generate my Weekly Review")}
                     style={promptChipStyle}

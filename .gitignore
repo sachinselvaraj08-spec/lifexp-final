@@ -19,6 +19,9 @@ node_modules/
 service-account.json
 **/service-account.json
 **/service-account*.json
+# Exact downloaded key filename (belt-and-suspenders)
+lifexp-9df28-firebase-adminsdk-fbsvc-fc5a9fc91c.json
+**/*adminsdk*.json
 
 # ── Next.js build output ─────────────────────────────────────
 apps/frontend/.next/

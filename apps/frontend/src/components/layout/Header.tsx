@@ -14,7 +14,7 @@ export const Header: React.FC = () => {
   const xpPercentage = Math.min(100, Math.round((xpInCurrentLevel / nextLevelXp) * 100));
 
   return (
-    <header style={headerStyle}>
+    <header style={headerStyle} className="header-desktop">
       {/* Level & XP Bar Container */}
       <div style={statsGroupStyle}>
         <div style={badgeStyle}>LVL {level}</div>

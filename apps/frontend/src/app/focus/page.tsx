@@ -4,10 +4,14 @@ import React, { useState, useEffect } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 import { useGamification } from "../../context/GamificationContext";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../services/api";
 
 export default function FocusPage() {
   const { addXP, addCoins } = useGamification();
+  const { token } = useAuth();
 
   // Modes: 25m Pomodoro (1500s), 50m Deep Work (3000s), 5m Short Break (300s)
   const [timerMode, setTimerMode] = useState<"pomodoro" | "deep" | "shortBreak">("pomodoro");
@@ -15,13 +19,28 @@ export default function FocusPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [ambientSound, setAmbientSound] = useState<"none" | "rain" | "lofi">("none");
 
-  // Focus Stats
-  const [todayFocusMinutes, setTodayFocusMinutes] = useState(75);
-  const [completedSessions, setCompletedSessions] = useState(3);
+  // Focus Stats — initialized to 0, hydrated from Firestore
+  const [todayFocusMinutes, setTodayFocusMinutes] = useState(0);
+  const [completedSessions, setCompletedSessions] = useState(0);
+
+  // Fetch today's daily progress from Firestore on mount
+  useEffect(() => {
+    if (!token) return;
+    api
+      .get<{ totalFocusMinutes: number; completedSessions: number }>(
+        "/api/v1/focus/daily",
+        token
+      )
+      .then((data) => {
+        setTodayFocusMinutes(data.totalFocusMinutes ?? 0);
+        setCompletedSessions(data.completedSessions ?? 0);
+      })
+      .catch((err) => console.error("[FocusPage] Failed to fetch daily progress:", err));
+  }, [token]);
 
   // Timer Tick Logic
   useEffect(() => {
-    let interval: any = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isRunning && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -39,11 +58,23 @@ export default function FocusPage() {
       setTodayFocusMinutes((prev) => prev + durationMins);
       setCompletedSessions((prev) => prev + 1);
 
+      // Persist session to Firestore
+      if (token) {
+        api
+          .post("/api/v1/focus/sessions", token, {
+            mode: timerMode,
+            durationMinutes: durationMins,
+            xpEarned: earnedXP,
+            coinsEarned: earnedCoins,
+          })
+          .catch((err) => console.error("[FocusPage] Failed to save session:", err));
+      }
+
       alert(`🎉 Focus Session Completed! You earned +${earnedXP} XP and +${earnedCoins} Coins!`);
     }
 
-    return () => clearInterval(interval);
-  }, [isRunning, timeLeft, timerMode, addXP, addCoins]);
+    return () => { if (interval) clearInterval(interval); };
+  }, [isRunning, timeLeft, timerMode, addXP, addCoins, token]);
 
   const switchMode = (mode: "pomodoro" | "deep" | "shortBreak") => {
     setIsRunning(false);
@@ -70,15 +101,16 @@ export default function FocusPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>⏱️ Focus Mode & Pomodoro</h1>
                 <p style={pageSubtitleStyle}>
@@ -93,9 +125,10 @@ export default function FocusPage() {
                 ...timerCardStyle,
                 borderColor: isRunning ? "#F43F5E" : "#334155",
               }}
+              className="focus-timer-card"
             >
               {/* Mode Switcher Tabs */}
-              <div style={modeGroupStyle}>
+              <div style={modeGroupStyle} className="focus-mode-tabs">
                 <button
                   onClick={() => switchMode("pomodoro")}
                   style={{
@@ -129,10 +162,10 @@ export default function FocusPage() {
               </div>
 
               {/* Countdown Clock Display */}
-              <div style={clockDisplayStyle}>{formatTime(timeLeft)}</div>
+              <div style={clockDisplayStyle} className="focus-clock">{formatTime(timeLeft)}</div>
 
               {/* Timer Control Buttons */}
-              <div style={controlsRowStyle}>
+              <div style={controlsRowStyle} className="focus-controls-row">
                 <button
                   onClick={toggleTimer}
                   style={{
@@ -153,7 +186,7 @@ export default function FocusPage() {
             </div>
 
             {/* Ambient Sound & Distraction Shield Controls */}
-            <div style={gridTwoColStyle}>
+            <div style={gridTwoColStyle} className="grid-2col">
               <div style={cardStyle}>
                 <h2 style={cardTitleStyle}>🎧 Ambient Soundscapes</h2>
                 <div style={ambientOptionsStyle}>

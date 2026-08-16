@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "year">("30d");
@@ -45,15 +46,16 @@ export default function AnalyticsPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>📈 Performance & Analytics</h1>
                 <p style={pageSubtitleStyle}>
@@ -61,7 +63,7 @@ export default function AnalyticsPage() {
                 </p>
               </div>
 
-              <div style={timeRangeSelectorStyle}>
+              <div style={timeRangeSelectorStyle} className="analytics-time-range">
                 <button
                   onClick={() => setTimeRange("7d")}
                   style={{
@@ -96,7 +98,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Scores Row */}
-            <div style={scoresGridStyle}>
+            <div style={scoresGridStyle} className="grid-2col">
               <div style={scoreCardStyle}>
                 <div style={scoreHeaderStyle}>
                   <span style={scoreTitleStyle}>Productivity Score</span>
@@ -145,7 +147,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              <div style={heatmapGridStyle}>
+              <div style={heatmapGridStyle} className="heatmap-grid">
                 {heatmapDays.map((d) => (
                   <div
                     key={d.day}
@@ -153,6 +155,7 @@ export default function AnalyticsPage() {
                       ...heatmapSquareStyle,
                       backgroundColor: getHeatmapColor(d.intensity),
                     }}
+                    className="heatmap-cell"
                     title={`Day ${d.day}: ${d.intensity * 2} habits completed`}
                   />
                 ))}
@@ -160,7 +163,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Category Breakdown & Trend Charts */}
-            <div style={gridTwoColStyle}>
+            <div style={gridTwoColStyle} className="grid-2col">
               <div style={cardStyle}>
                 <h2 style={cardTitleStyle}>🎯 Category Distribution</h2>
                 <div style={categoryListStyle}>

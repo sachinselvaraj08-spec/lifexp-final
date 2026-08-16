@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 
 export default function LeaderboardPage() {
   const [leagueTab, setLeagueTab] = useState<"global" | "college" | "friends">("global");
@@ -19,15 +20,16 @@ export default function LeaderboardPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>🏆 Global & College Leaderboards</h1>
                 <p style={pageSubtitleStyle}>
@@ -36,7 +38,7 @@ export default function LeaderboardPage() {
               </div>
 
               {/* League Tabs */}
-              <div style={tabGroupStyle}>
+              <div style={tabGroupStyle} className="leaderboard-tabs">
                 <button
                   onClick={() => setLeagueTab("global")}
                   style={{
@@ -73,33 +75,33 @@ export default function LeaderboardPage() {
             {/* Top 3 Podium Card */}
             <div style={podiumContainerStyle}>
               {/* Rank 2 */}
-              <div style={podiumCardStyle}>
+              <div style={podiumCardStyle} className="podium-card">
                 <span style={podiumRankBadgeStyle}>#2</span>
-                <div style={podiumAvatarStyle}>🥈</div>
-                <div style={podiumNameStyle}>{globalRankings[1].name}</div>
+                <div style={podiumAvatarStyle} className="podium-avatar">🥈</div>
+                <div style={podiumNameStyle} className="podium-name">{globalRankings[1].name}</div>
                 <div style={podiumXpStyle}>{globalRankings[1].xp} XP</div>
               </div>
 
               {/* Rank 1 */}
-              <div style={{ ...podiumCardStyle, borderColor: "#F59E0B", transform: "scale(1.05)" }}>
+              <div style={{ ...podiumCardStyle, borderColor: "#F59E0B", transform: "scale(1.05)" }} className="podium-card">
                 <span style={{ ...podiumRankBadgeStyle, backgroundColor: "#F59E0B" }}>#1</span>
-                <div style={podiumAvatarStyle}>👑</div>
-                <div style={podiumNameStyle}>{globalRankings[0].name}</div>
+                <div style={podiumAvatarStyle} className="podium-avatar">👑</div>
+                <div style={podiumNameStyle} className="podium-name">{globalRankings[0].name}</div>
                 <div style={{ ...podiumXpStyle, color: "#F59E0B" }}>{globalRankings[0].xp} XP</div>
               </div>
 
               {/* Rank 3 */}
-              <div style={podiumCardStyle}>
+              <div style={podiumCardStyle} className="podium-card">
                 <span style={podiumRankBadgeStyle}>#3</span>
-                <div style={podiumAvatarStyle}>🥉</div>
-                <div style={podiumNameStyle}>{globalRankings[2].name}</div>
+                <div style={podiumAvatarStyle} className="podium-avatar">🥉</div>
+                <div style={podiumNameStyle} className="podium-name">{globalRankings[2].name}</div>
                 <div style={podiumXpStyle}>{globalRankings[2].xp} XP</div>
               </div>
             </div>
 
             {/* Leaderboard Table */}
             <div style={cardStyle}>
-              <div style={tableWrapperStyle}>
+              <div style={tableWrapperStyle} className="table-scroll-wrapper">
                 <table style={tableStyle}>
                   <thead>
                     <tr>

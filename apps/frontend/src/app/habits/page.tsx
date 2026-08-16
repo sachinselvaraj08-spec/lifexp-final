@@ -4,169 +4,87 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
+import { useHabits, Habit, CreateHabitInput } from "../../context/HabitsContext";
+import { useGamification } from "../../context/GamificationContext";
 
-export interface Habit {
-  id: string;
-  title: string;
-  category: "Health" | "Productivity" | "Learning" | "Mindfulness";
-  frequency: "daily" | "weekly" | "monthly";
-  targetQuantity: number;
-  unit: string;
-  currentStreak: number;
-  longestStreak: number;
-  // Map date string YYYY-MM-DD -> completion count / status boolean
-  logs: Record<string, boolean>;
+// ── Dynamic week / date helpers ──────────────────────────────────────────────
+function getTodayStr(): string {
+  return new Date().toISOString().split("T")[0];
 }
 
+function getCurrentWeekDays(): { label: string; dateStr: string }[] {
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+    const label = d.toLocaleDateString("en-US", { weekday: "short", day: "numeric" });
+    return { label, dateStr };
+  });
+}
+
+// ── Page component ────────────────────────────────────────────────────────────
 export default function HabitsPage() {
+  const { habits, isLoading, error, createHabit, updateHabit, deleteHabit, toggleCompletion } =
+    useHabits();
+  const { addXP } = useGamification();
+
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Initial Mock Habits for Excel Tracker
-  const [habits, setHabits] = useState<Habit[]>([
-    {
-      id: "h1",
-      title: "Gym & Strength Training",
-      category: "Health",
-      frequency: "daily",
-      targetQuantity: 1,
-      unit: "session",
-      currentStreak: 12,
-      longestStreak: 18,
-      logs: {
-        "2026-07-20": true,
-        "2026-07-21": true,
-        "2026-07-22": true,
-        "2026-07-23": true,
-      },
-    },
-    {
-      id: "h2",
-      title: "Read Technical Articles / Books",
-      category: "Learning",
-      frequency: "daily",
-      targetQuantity: 20,
-      unit: "pages",
-      currentStreak: 5,
-      longestStreak: 14,
-      logs: {
-        "2026-07-20": true,
-        "2026-07-21": false,
-        "2026-07-22": true,
-        "2026-07-23": true,
-      },
-    },
-    {
-      id: "h3",
-      title: "Deep Work Focus Block (45m)",
-      category: "Productivity",
-      frequency: "daily",
-      targetQuantity: 2,
-      unit: "blocks",
-      currentStreak: 8,
-      longestStreak: 10,
-      logs: {
-        "2026-07-20": true,
-        "2026-07-21": true,
-        "2026-07-22": false,
-        "2026-07-23": true,
-      },
-    },
-    {
-      id: "h4",
-      title: "10-min Mindfulness Meditation",
-      category: "Mindfulness",
-      frequency: "daily",
-      targetQuantity: 1,
-      unit: "session",
-      currentStreak: 14,
-      longestStreak: 30,
-      logs: {
-        "2026-07-20": true,
-        "2026-07-21": true,
-        "2026-07-22": true,
-        "2026-07-23": true,
-      },
-    },
-  ]);
-
-  // Form State
+  // Form state
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<Habit["category"]>("Health");
   const [newFrequency, setNewFrequency] = useState<Habit["frequency"]>("daily");
   const [newTarget, setNewTarget] = useState(1);
   const [newUnit, setNewUnit] = useState("times");
 
-  // Dates for current weekly spreadsheet matrix (Mon 20 - Sun 26 Jul 2026)
-  const weekDays = [
-    { label: "Mon 20", dateStr: "2026-07-20" },
-    { label: "Tue 21", dateStr: "2026-07-21" },
-    { label: "Wed 22", dateStr: "2026-07-22" },
-    { label: "Thu 23", dateStr: "2026-07-23" },
-    { label: "Fri 24", dateStr: "2026-07-24" },
-    { label: "Sat 25", dateStr: "2026-07-25" },
-    { label: "Sun 26", dateStr: "2026-07-26" },
-  ];
+  const weekDays = getCurrentWeekDays();
+  const todayStr = getTodayStr();
 
-  const todayStr = "2026-07-23";
-
-  // Toggle log for specific date
-  const toggleCell = (habitId: string, dateStr: string) => {
-    setHabits((prev) =>
-      prev.map((h) => {
-        if (h.id === habitId) {
-          const current = !!h.logs[dateStr];
-          const updatedLogs = { ...h.logs, [dateStr]: !current };
-          const updatedStreak = !current ? h.currentStreak + 1 : Math.max(0, h.currentStreak - 1);
-          return {
-            ...h,
-            logs: updatedLogs,
-            currentStreak: updatedStreak,
-            longestStreak: Math.max(h.longestStreak, updatedStreak),
-          };
-        }
-        return h;
-      })
-    );
+  // ── Toggle cell ─────────────────────────────────────────────────────────
+  const handleToggleCell = async (habitId: string, dateStr: string) => {
+    const xpAwarded = await toggleCompletion(habitId, dateStr);
+    if (xpAwarded > 0) addXP(xpAwarded);
   };
 
-  // Save new or edited habit
-  const handleSaveHabit = (e: React.FormEvent) => {
+  // ── Save (create or update) ──────────────────────────────────────────────
+  const handleSaveHabit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-
-    if (editingHabit) {
-      setHabits((prev) =>
-        prev.map((h) =>
-          h.id === editingHabit.id
-            ? {
-                ...h,
-                title: newTitle,
-                category: newCategory,
-                frequency: newFrequency,
-                targetQuantity: newTarget,
-                unit: newUnit,
-              }
-            : h
-        )
-      );
-    } else {
-      const created: Habit = {
-        id: `h_${Date.now()}`,
-        title: newTitle,
-        category: newCategory,
-        frequency: newFrequency,
-        targetQuantity: newTarget,
-        unit: newUnit,
-        currentStreak: 0,
-        longestStreak: 0,
-        logs: {},
-      };
-      setHabits((prev) => [...prev, created]);
+    setIsSaving(true);
+    try {
+      if (editingHabit) {
+        await updateHabit(editingHabit.id, {
+          title: newTitle,
+          category: newCategory,
+          frequency: newFrequency,
+          targetQuantity: newTarget,
+          unit: newUnit,
+        });
+      } else {
+        const input: CreateHabitInput = {
+          title: newTitle,
+          category: newCategory,
+          frequency: newFrequency,
+          targetQuantity: newTarget,
+          unit: newUnit,
+        };
+        await createHabit(input);
+      }
+      closeModal();
+    } catch (err) {
+      console.error("Failed to save habit:", err);
+    } finally {
+      setIsSaving(false);
     }
-
-    closeModal();
   };
 
   const openCreateModal = () => {
@@ -189,9 +107,9 @@ export default function HabitsPage() {
     setIsModalOpen(true);
   };
 
-  const deleteHabit = (id: string) => {
+  const handleDeleteHabit = async (id: string) => {
     if (confirm("Are you sure you want to delete this habit?")) {
-      setHabits((prev) => prev.filter((h) => h.id !== id));
+      await deleteHabit(id);
     }
   };
 
@@ -202,15 +120,30 @@ export default function HabitsPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
+            {/* Loading / Error States */}
+            {isLoading && (
+              <div style={{ color: "#94A3B8", textAlign: "center", padding: "40px" }}>
+                Loading habits from Firestore…
+              </div>
+            )}
+            {error && (
+              <div style={{ color: "#EF4444", textAlign: "center", padding: "20px", border: "1px solid #EF4444", borderRadius: "8px" }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            {!isLoading && (
+              <>
             {/* Top Action Header & View Switcher */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>📊 Excel Habit Tracker</h1>
                 <p style={pageSubtitleStyle}>
@@ -218,9 +151,9 @@ export default function HabitsPage() {
                 </p>
               </div>
 
-              <div style={controlsRightStyle}>
+              <div style={controlsRightStyle} className="habits-controls-right">
                 {/* View Switcher Tabs */}
-                <div style={tabGroupStyle}>
+                <div style={tabGroupStyle} className="habits-tab-group">
                   <button
                     onClick={() => setViewMode("daily")}
                     style={{
@@ -253,7 +186,7 @@ export default function HabitsPage() {
                   </button>
                 </div>
 
-                <button onClick={openCreateModal} style={addButtonStyle}>
+                <button onClick={openCreateModal} style={addButtonStyle} className="habits-add-btn">
                   + New Habit
                 </button>
               </div>
@@ -263,13 +196,13 @@ export default function HabitsPage() {
             {viewMode === "daily" && (
               <div style={dailyContainerStyle}>
                 <h2 style={sectionTitleStyle}>Today's Schedule ({todayStr})</h2>
-                <div style={dailyGridStyle}>
+                <div style={dailyGridStyle} className="habits-daily-grid">
                   {habits.map((habit) => {
                     const isDone = !!habit.logs[todayStr];
                     return (
                       <div
                         key={habit.id}
-                        onClick={() => toggleCell(habit.id, todayStr)}
+                        onClick={() => handleToggleCell(habit.id, todayStr)}
                         style={{
                           ...dailyCardStyle,
                           borderColor: isDone ? "#10B981" : "#334155",
@@ -303,7 +236,7 @@ export default function HabitsPage() {
             {/* WEEKLY MATRIX (EXCEL STYLE TRACKER) */}
             {(viewMode === "weekly" || viewMode === "monthly") && (
               <div style={excelContainerStyle}>
-                <div style={tableWrapperStyle}>
+                <div style={tableWrapperStyle} className="table-scroll-wrapper">
                   <table style={tableStyle}>
                     <thead>
                       <tr>
@@ -347,7 +280,7 @@ export default function HabitsPage() {
                               return (
                                 <td
                                   key={d.dateStr}
-                                  onClick={() => toggleCell(habit.id, d.dateStr)}
+                                  onClick={() => handleToggleCell(habit.id, d.dateStr)}
                                   style={{
                                     ...tdStyle,
                                     cursor: "pointer",
@@ -376,7 +309,7 @@ export default function HabitsPage() {
                                   ✏️
                                 </button>
                                 <button
-                                  onClick={() => deleteHabit(habit.id)}
+                                  onClick={() => handleDeleteHabit(habit.id)}
                                   style={{ ...iconButtonStyle, color: "#EF4444" }}
                                   title="Delete Habit"
                                 >
@@ -414,7 +347,7 @@ export default function HabitsPage() {
             {/* CREATE / EDIT MODAL */}
             {isModalOpen && (
               <div style={modalOverlayStyle}>
-                <div style={modalContentStyle}>
+                <div style={modalContentStyle} className="modal-overlay-content responsive-modal">
                   <div style={modalHeaderStyle}>
                     <h2 style={modalTitleStyle}>
                       {editingHabit ? "Edit Habit" : "Create New Habit"}
@@ -437,7 +370,7 @@ export default function HabitsPage() {
                       />
                     </div>
 
-                    <div style={formRowStyle}>
+                    <div style={formRowStyle} className="modal-form-row">
                       <div style={inputGroupStyle}>
                         <label style={labelStyle}>Category</label>
                         <select
@@ -466,7 +399,7 @@ export default function HabitsPage() {
                       </div>
                     </div>
 
-                    <div style={formRowStyle}>
+                    <div style={formRowStyle} className="modal-form-row">
                       <div style={inputGroupStyle}>
                         <label style={labelStyle}>Target Quantity</label>
                         <input
@@ -492,12 +425,14 @@ export default function HabitsPage() {
                       </div>
                     </div>
 
-                    <button type="submit" style={saveButtonStyle}>
-                      {editingHabit ? "Save Changes" : "Create Habit"}
+                    <button type="submit" style={saveButtonStyle} disabled={isSaving}>
+                      {isSaving ? "Saving…" : editingHabit ? "Save Changes" : "Create Habit"}
                     </button>
                   </form>
                 </div>
               </div>
+            )}
+            </>
             )}
           </main>
         </div>

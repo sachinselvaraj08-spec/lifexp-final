@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 import { useAuth } from "../../context/AuthContext";
 
 export default function ProfilePage() {
@@ -23,16 +24,17 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Profile Overview Card */}
             <div style={cardStyle}>
-              <div style={profileHeaderStyle}>
+              <div style={profileHeaderStyle} className="profile-header-inner">
                 <div style={avatarWrapperStyle}>
                   {user?.photoURL ? (
                     <img src={user.photoURL} alt="Avatar" style={avatarStyle} />
@@ -44,8 +46,8 @@ export default function ProfilePage() {
                   <div style={levelTagStyle}>LVL 14</div>
                 </div>
 
-                <div style={profileInfoStyle}>
-                  <div style={titleRowStyle}>
+                <div style={profileInfoStyle} className="profile-info-section">
+                  <div style={titleRowStyle} className="profile-title-row">
                     <h1 style={userNameStyle}>{user?.displayName || "Adventurer"}</h1>
                     <span style={titleBadgeStyle}>{title}</span>
                   </div>
@@ -55,6 +57,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => setIsEditing(!isEditing)}
                     style={editButtonStyle}
+                    className="profile-edit-btn"
                   >
                     {isEditing ? "Save Profile" : "✏️ Edit Profile"}
                   </button>
@@ -62,7 +65,7 @@ export default function ProfilePage() {
               </div>
 
               {isEditing && (
-                <div style={editFormStyle}>
+                <div style={editFormStyle} className="profile-edit-form">
                   <div style={inputGroupStyle}>
                     <label style={labelStyle}>Title</label>
                     <input
@@ -86,7 +89,7 @@ export default function ProfilePage() {
             </div>
 
             {/* User Statistics Grid */}
-            <div style={statsGridStyle}>
+            <div style={statsGridStyle} className="profile-stats-grid">
               <div style={statCardStyle}>
                 <span style={statIconStyle}>⚡</span>
                 <div>
@@ -123,7 +126,7 @@ export default function ProfilePage() {
             {/* Achievements Showcase */}
             <div style={cardStyle}>
               <h2 style={sectionTitleStyle}>🏆 Achievements & Badges</h2>
-              <div style={achievementGridStyle}>
+              <div style={achievementGridStyle} className="achievement-grid">
                 {achievements.map((item) => (
                   <div
                     key={item.id}

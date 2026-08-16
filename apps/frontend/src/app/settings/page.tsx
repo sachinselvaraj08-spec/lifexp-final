@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ProtectedRoute } from "../../components/layout/ProtectedRoute";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { Header } from "../../components/layout/Header";
+import { MobileNav } from "../../components/layout/MobileNav";
 
 export default function SettingsPage() {
   // Android Screen Time State
@@ -17,15 +18,16 @@ export default function SettingsPage() {
 
   return (
     <ProtectedRoute>
-      <div style={layoutStyle}>
+      <div style={layoutStyle} className="lifexp-layout">
+        <MobileNav />
         <Sidebar />
 
         <div style={mainWrapperStyle}>
           <Header />
 
-          <main style={contentStyle}>
+          <main style={contentStyle} className="lifexp-content">
             {/* Top Bar Header */}
-            <div style={topBarStyle}>
+            <div style={topBarStyle} className="page-top-bar">
               <div>
                 <h1 style={pageTitleStyle}>⚙️ System Settings & Integrations</h1>
                 <p style={pageSubtitleStyle}>
@@ -36,7 +38,7 @@ export default function SettingsPage() {
 
             {/* Android Screen Time Integration Card */}
             <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
+              <div style={cardHeaderStyle} className="settings-card-header">
                 <h2 style={cardTitleStyle}>📱 Android Screen Time Integration</h2>
                 <span style={activeBadgeStyle}>
                   {androidSyncEnabled ? "Connected (UsageStats API)" : "Disconnected"}
