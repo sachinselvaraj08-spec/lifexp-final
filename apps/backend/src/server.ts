@@ -39,16 +39,33 @@ app.use(
 
 app.use(express.json());
 
-// ── Public routes ─────────────────────────────────────────────────────────────
+// ── Health Check Endpoints ───────────────────────────────────────────────────
 app.get("/health", (_, res: Response) => {
-  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
+});
+
+app.get("/api/health", (_, res: Response) => {
+  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
 });
 
 app.get("/api/v1/health", (_, res: Response) => {
-  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+  res.status(200).json({ success: true, service: "lifexp-backend", firebase: true });
 });
 
-// ── Authenticated API routes ──────────────────────────────────────────────────
+// ── Authenticated Diagnostic Debug Endpoint ──────────────────────────────────
+app.get(
+  "/api/debug/auth",
+  authMiddleware,
+  (req: AuthenticatedRequest, res: Response) => {
+    res.status(200).json({
+      authenticated: true,
+      uid: req.user?.uid,
+      email: req.user?.email,
+    });
+  }
+);
+
+// ── Authenticated Business API routes ─────────────────────────────────────────
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/habits", habitsRoutes);
 app.use("/api/v1/focus", focusRoutes);

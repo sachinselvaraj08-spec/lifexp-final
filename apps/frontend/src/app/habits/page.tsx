@@ -192,6 +192,45 @@ export default function HabitsPage() {
               </div>
             </div>
 
+            {/* EMPTY STATE — Displayed when user has 0 habits */}
+            {habits.length === 0 && (
+              <div
+                style={{
+                  backgroundColor: "#1E293B",
+                  border: "1px dashed #334155",
+                  borderRadius: "12px",
+                  padding: "48px 24px",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "16px",
+                  marginTop: "12px",
+                }}
+              >
+                <div style={{ fontSize: "2.5rem" }}>🌱</div>
+                <h3 style={{ fontSize: "1.3rem", fontWeight: "700", margin: 0 }}>No habits created yet</h3>
+                <p style={{ color: "#94A3B8", margin: 0, maxWidth: "400px" }}>
+                  Your habit tracker is currently empty. Click the button below to add your first habit to Firestore!
+                </p>
+                <button
+                  onClick={openCreateModal}
+                  style={{
+                    backgroundColor: "#F59E0B",
+                    color: "#0F172A",
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    fontWeight: "800",
+                    cursor: "pointer",
+                    marginTop: "8px",
+                  }}
+                >
+                  + Create Your First Habit
+                </button>
+              </div>
+            )}
+
             {/* DAILY VIEW */}
             {viewMode === "daily" && (
               <div style={dailyContainerStyle}>
