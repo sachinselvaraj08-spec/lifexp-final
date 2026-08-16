@@ -7,7 +7,10 @@ import { auth as clientAuth } from "./firebase";
 
 function getBackendUrl(): string {
   const rawUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://lifexp-backend-finalz.vercel.app";
-  return rawUrl.replace(/\/+$/, "");
+  const normalized = rawUrl.includes("lifexp-backend-final2.vercel.app")
+    ? "https://lifexp-backend-finalz.vercel.app"
+    : rawUrl;
+  return normalized.replace(/\/+$/, "");
 }
 
 /**
@@ -95,7 +98,7 @@ async function request<T>(
     let message = `HTTP ${res.status} ${res.statusText}`;
     try {
       const json = await res.json();
-      message = json.error ?? json.message ?? message;
+      message = json.message ?? json.error ?? message;
     } catch {
       // response body was not JSON – keep the status string
     }

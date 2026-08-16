@@ -25,8 +25,9 @@ if (!admin.apps.length) {
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || "lifexp-9df28",
       });
-      console.log("[Firebase] Admin SDK initialized from FIREBASE_SERVICE_ACCOUNT_JSON env var.");
+      console.log("[Firebase] Admin SDK initialized for project:", serviceAccount.project_id || "lifexp-9df28");
     } else if (fs.existsSync(resolvedPath)) {
       // Local development fallback: credentials file on disk
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
@@ -37,11 +38,14 @@ if (!admin.apps.length) {
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || "lifexp-9df28",
       });
       console.log("[Firebase] Admin SDK initialized from service account file:", resolvedPath);
     } else {
       // GCP / Firebase Hosting default application credentials
-      admin.initializeApp();
+      admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID || "lifexp-9df28",
+      });
       console.log("[Firebase] Admin SDK initialized using default application credentials.");
     }
   } catch (error) {

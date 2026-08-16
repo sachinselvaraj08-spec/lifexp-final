@@ -41,8 +41,7 @@ export async function authMiddleware(
 
   try {
     const decodedToken = await auth.verifyIdToken(idToken);
-    console.log("[AUTH] Firebase token verified successfully");
-    console.log("[AUTH] Firebase UID:", decodedToken.uid);
+    console.log("[AUTH] Firebase token verified successfully for UID:", decodedToken.uid);
 
     req.user = {
       uid: decodedToken.uid,
@@ -52,14 +51,18 @@ export async function authMiddleware(
     };
     return next();
   } catch (error: any) {
+    const expectedProjectId = auth.app.options.projectId || process.env.FIREBASE_PROJECT_ID || "lifexp-9df28";
     console.error("[AUTH] Firebase token verification failed:", {
       code: error?.code,
       message: error?.message,
+      expectedProjectId,
     });
     return res.status(401).json({
       success: false,
-      error: "Invalid or expired authorization token",
+      error: error?.message || "Invalid or expired authorization token",
       message: error?.message || "Invalid or expired authorization token.",
+      code: error?.code || "auth/invalid-token",
+      expectedProjectId,
     });
   }
 }
